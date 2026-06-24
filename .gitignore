@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+dist/
+
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# Encrypted database + SQLite sidecar files
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Google Cloud service-account keys (Vertex)
+*service-account*.json
+gcp-*.json
+*.credentials.json
+
+# Playwright artifacts (Passe 2)
+screenshots/
+playwright-report/
+test-results/
+
+# Logs / misc
+*.log
+.DS_Store
+coverage/
