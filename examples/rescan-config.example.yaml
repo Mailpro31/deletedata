@@ -1,0 +1,24 @@
+# Exemple de config de re-scan (vérification par recherche publique).
+# Permet d'obtenir la confiance `confirmed_rescan` quand le profil a disparu.
+# Copier, adapter, puis :
+#   npm run cli -- rescan set-config <slug> --file mon-rescan.yaml
+#   npm run cli -- rescan run --broker <slug>
+#
+# Jetons utilisables dans searchUrl et les champs :
+#   $fullName  $firstName  $lastName  $email  $address  $phone
+#
+# HONNÊTETÉ : "supprimé" n'est conclu QUE si `notFoundText` est présent ET
+# qu'aucun `foundSelector` ne matche. Sinon -> indéterminé (jamais de faux positif).
+
+searchUrl: "https://exemple-broker.com/search?q=$firstName+$lastName"
+
+# (Optionnel) si la recherche passe par un formulaire au lieu d'une URL directe :
+# searchForm:
+#   fields:
+#     - selector: "#q"
+#       value: "$fullName"
+#   submitSelector: "button.search"
+
+foundSelector: ".result-card"        # PRÉSENT => profil ENCORE en ligne
+notFoundText: "No results found"     # PRÉSENT => profil absent (supprimé)
+waitMs: 2000                          # attente après chargement (pour le JS)

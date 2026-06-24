@@ -183,6 +183,20 @@ d'application » dédié (révocable à tout moment).
 > 🗑️ Tu peux le révoquer quand tu veux depuis la même page — l'outil cesse alors
 > d'accéder à ta boîte.
 
+#### (Optionnel) Organiser les réponses avec un libellé Gmail
+
+Pour regrouper toutes les réponses des brokers au même endroit, crée un **filtre
+Gmail** qui leur applique un libellé (ex. `deletedata`) :
+
+1. Gmail → roue dentée → « Voir tous les paramètres » → « Filtres et adresses
+   bloquées » → « Créer un filtre ».
+2. Champ **« À »** : `tonemail+*@gmail.com` (capte tous les alias de plus-addressing).
+3. « Créer un filtre » → coche **« Appliquer le libellé »** → `deletedata`.
+
+Bonus : tu peux alors **restreindre la vérification** à ce libellé en mettant
+`IMAP_MAILBOX=deletedata` dans `.env` (moins de bruit, plus rapide à scanner).
+Pour retirer le libellé plus tard : Gmail → Paramètres → Libellés → supprimer.
+
 ### 5.2 Google Cloud + Vertex AI (classification des réponses)
 
 **Tu peux SAUTER cette étape pour démarrer.** Sans Vertex, tu utilises
@@ -269,9 +283,17 @@ RETARGET_DAYS=90                 # délai anti-spam avant de re-cibler un broker
 # Crée la base CHIFFRÉE et applique le schéma
 npm run db:migrate
 
-# Vérifie SMTP / IMAP / Vertex (texte de test, AUCUNE donnée perso)
+# Diagnostic : ce qui est configuré, ce qui manque, et la prochaine action
+npm run doctor
+
+# Vérifie les connexions réseau SMTP / IMAP / Vertex (texte de test, AUCUNE donnée perso)
 npm run test-connections
 ```
+
+`npm run doctor` est ta commande **« où j'en suis ? »** : il affiche le mode
+(dry-run/live), coche ✓/✗ chaque groupe de config (sans jamais révéler un secret),
+indique si la base est lisible, et te donne la prochaine action. Reviens-y dès que
+tu as un doute.
 
 `test-connections` te dit, ligne par ligne, ce qui marche :
 
@@ -671,6 +693,7 @@ Ré-inspecte la page (section 13) et regarde le screenshot dans `./screenshots`.
 
 | Commande                              | Rôle                                                        |
 | ------------------------------------- | ----------------------------------------------------------- |
+| `doctor`                              | Diagnostic : config, base, état, prochaine action (rien envoyé) |
 | `db migrate`                          | Crée/met à jour la base chiffrée                            |
 | `identity add … / identity list`      | Déclare/voir tes identités                                  |
 | `brokers seed`                        | Charge le jeu curaté EU/FR (actif)                          |

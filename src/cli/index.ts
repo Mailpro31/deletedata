@@ -49,6 +49,7 @@ import {
   queryRequests,
   type RequestFilter,
 } from "../reporting/status";
+import { runDoctor } from "../diagnostics/doctor";
 
 // ---------------------------------------------------------------------------
 //  Helpers
@@ -502,6 +503,12 @@ program
       closeDatabase();
     }
   });
+
+// --- doctor ----------------------------------------------------------------
+program
+  .command("doctor")
+  .description("Diagnostic : config, base, état, prochaine action (n'envoie rien)")
+  .action(() => run(() => runDoctor()));
 
 // --- status / requests -----------------------------------------------------
 program

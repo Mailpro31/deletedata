@@ -10,6 +10,8 @@
   },
   "scripts": {
     "cli": "tsx src/cli/index.ts",
+    "doctor": "tsx src/cli/index.ts doctor",
+    "dashboard": "npm run build --prefix web && tsx src/cli/index.ts serve",
     "test-connections": "tsx scripts/test-connections.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",

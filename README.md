@@ -118,10 +118,12 @@ Crée la base **chiffrée** `data/deletedata.db` et applique le schéma.
 ## 5. Tester les connexions
 
 ```bash
-npm run test-connections
+npm run doctor              # config + base + état + prochaine action (n'envoie rien)
+npm run test-connections    # vérifie SMTP / IMAP / Vertex (texte de test, sans PII)
 ```
 
-Vérifie SMTP, IMAP et Vertex (un court texte de test, sans aucune PII).
+`doctor` coche ✓/✗ chaque groupe de config (sans révéler de secret) et indique la
+prochaine étape. `test-connections` valide les connexions réseau.
 
 ---
 
