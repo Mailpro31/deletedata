@@ -37,6 +37,9 @@ npm run cli -- review 1 --full       # RELIS les emails avant tout envoi réel
 > 🧭 **Guide pas-à-pas complet** (app password Gmail et Vertex AI clic par clic,
 > passage en envoi réel, dépannage, escalade CNIL) : **[GUIDE.md](./GUIDE.md)**.
 > Ce README en est la version condensée.
+>
+> 🌐 **L'héberger en ligne, gratuitement et en privé** (VM gratuite à vie +
+> Tailscale, accessible de partout mais seulement par toi) : **[DEPLOY.md](./DEPLOY.md)**.
 
 ## Sommaire
 
