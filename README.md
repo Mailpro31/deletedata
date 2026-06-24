@@ -1,5 +1,9 @@
 # deletedata — suppression de mes données chez les data brokers (RGPD)
 
+[![CI](https://github.com/Mailpro31/deletedata/actions/workflows/ci.yml/badge.svg)](https://github.com/Mailpro31/deletedata/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A520-3c873a.svg)](https://nodejs.org)
+
 Outil **personnel, local et mono-utilisateur** (un « Incogni gratuit auto-hébergé ») qui :
 
 1. **envoie** en mon nom des demandes d'effacement RGPD (art. 17) aux data brokers ;
@@ -9,10 +13,38 @@ Outil **personnel, local et mono-utilisateur** (un « Incogni gratuit auto-hébe
 > Je suis mon **propre sujet de données** (RGPD art. 17). Cet outil ne sert qu'à
 > **mes** données, pas à celles de tiers. Tout tourne et stocke **en local**.
 
-> 📘 **Débutant ou première utilisation ?** Suis le **[GUIDE.md](./GUIDE.md)** —
-> un pas-à-pas complet de zéro jusqu'à « données vérifiées supprimées » (setup
-> Gmail/Vertex détaillé, escalade CNIL, et une grosse section dépannage). Ce
-> README est la version courte de référence.
+## ⚡ Démarrage rapide
+
+```bash
+git clone https://github.com/Mailpro31/deletedata.git
+cd deletedata
+npm install                      # dépendances Node
+npx playwright install chromium  # navigateur headless (formulaires web + re-scan)
+cp .env.example .env             # puis remplir (voir « 3. Configuration »)
+npm run db:migrate               # crée la base CHIFFRÉE
+npm run doctor                   # affiche ce qui manque + la prochaine étape
+```
+
+Puis une **répétition générale sans risque** — rien n'est envoyé (dry-run par défaut) :
+
+```bash
+npm run cli -- identity add --label moi --primary --name "Prénom Nom" --email tonemail@gmail.com
+npm run cli -- brokers seed          # charge les brokers curatés (actifs)
+npm run cli -- draft                 # génère un lot de brouillons
+npm run cli -- review 1 --full       # RELIS les emails avant tout envoi réel
+```
+
+> 🧭 **Guide pas-à-pas complet** (app password Gmail et Vertex AI clic par clic,
+> passage en envoi réel, dépannage, escalade CNIL) : **[GUIDE.md](./GUIDE.md)**.
+> Ce README en est la version condensée.
+
+## Sommaire
+
+- [Principes non négociables](#principes-non-négociables)
+- [1. Prérequis](#1-prérequis) · [2. Installation](#2-installation) · [3. Configuration `.env`](#3-configuration-du-env)
+- [4. Initialiser la base](#4-initialiser-la-base) · [5. Tester les connexions](#5-tester-les-connexions) · [6. Premier cycle (dry-run)](#6-premier-cycle-en-dry-run--rien-ne-part)
+- [7. Envoi réel](#7-passer-en-envoi-réel-live) · [8. Vérifier les réponses](#8-vérifier-les-réponses-preuve-de-suppression) · [9. Statut & export](#9-statut-demandes-export)
+- [Statuts de confiance](#statuts-de-confiance-le-cœur-de-la-valeur) · [Sécurité locale](#sécurité-locale) · [Architecture](#architecture) · [Passe 2](#passe-2--automatisation-re-scan-scheduler-dashboard)
 
 ## Principes non négociables
 
@@ -37,9 +69,15 @@ Outil **personnel, local et mono-utilisateur** (un « Incogni gratuit auto-hébe
 ## 2. Installation
 
 ```bash
-npm install
-cp .env.example .env       # puis éditer .env (voir étape 3)
+git clone https://github.com/Mailpro31/deletedata.git
+cd deletedata
+npm install                      # dépendances Node
+npx playwright install chromium  # navigateur headless (formulaires + re-scan)
+cp .env.example .env             # puis éditer .env (étape 3)
 ```
+
+> `npm install` échoue sur `better-sqlite3` ? Il manque les outils de build natifs
+> (voir « 1. Prérequis »). Sous Windows, utilise WSL2.
 
 ## 3. Configuration du `.env`
 
