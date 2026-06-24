@@ -9,6 +9,11 @@ Outil **personnel, local et mono-utilisateur** (un « Incogni gratuit auto-hébe
 > Je suis mon **propre sujet de données** (RGPD art. 17). Cet outil ne sert qu'à
 > **mes** données, pas à celles de tiers. Tout tourne et stocke **en local**.
 
+> 📘 **Débutant ou première utilisation ?** Suis le **[GUIDE.md](./GUIDE.md)** —
+> un pas-à-pas complet de zéro jusqu'à « données vérifiées supprimées » (setup
+> Gmail/Vertex détaillé, escalade CNIL, et une grosse section dépannage). Ce
+> README est la version courte de référence.
+
 ## Principes non négociables
 
 - **Honnêteté du statut** : jamais affiché « supprimé » sans **preuve réelle**.
