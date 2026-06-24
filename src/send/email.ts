@@ -16,6 +16,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { requests, type RequestRow } from "../db/schema";
 import { getBrokerById } from "../brokers/registry";
+import { getIdentity } from "../identity/service";
 import { env, isLive, assertLive, requireSmtp } from "../config/env";
 import { initialConfidenceOnSend } from "../domain/status";
 import { audit } from "../audit/log";
@@ -30,6 +31,7 @@ export interface SendOptions {
 export interface SendSummary {
   total: number;
   sent: number;
+  formsSubmitted: number;
   simulated: number;
   manual: number;
   failed: number;
@@ -43,7 +45,7 @@ function addOneMonth(d: Date): Date {
   return n;
 }
 
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   const retries = 4;
   let attempt = 0;
   for (;;) {
@@ -62,7 +64,7 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
 }
 
 let transporter: Transporter | null = null;
-function getTransporter(): Transporter {
+export function getTransporter(): Transporter {
   if (transporter) return transporter;
   const s = requireSmtp();
   transporter = nodemailer.createTransport({
@@ -116,7 +118,14 @@ export async function sendApproved(opts: SendOptions = {}): Promise<SendSummary>
     );
   }
 
-  const summary: SendSummary = { total: rows.length, sent: 0, simulated: 0, manual: 0, failed: 0 };
+  const summary: SendSummary = {
+    total: rows.length,
+    sent: 0,
+    formsSubmitted: 0,
+    simulated: 0,
+    manual: 0,
+    failed: 0,
+  };
 
   for (const r of rows) {
     const broker = getBrokerById(r.brokerId);
@@ -126,33 +135,96 @@ export async function sendApproved(opts: SendOptions = {}): Promise<SendSummary>
       continue;
     }
 
-    // --- Canaux non automatisables en Passe 1 -> action manuelle -----------
-    if (r.channel !== "email") {
-      const reason =
-        r.channel === "form"
-          ? "remplissage de formulaire requis (automatisation = Passe 2)"
-          : broker.requiresIdentityDoc
-            ? "pièce d'identité requise"
-            : "action manuelle requise";
+    // --- Canal manuel : action manuelle requise (jamais automatisé) --------
+    if (r.channel === "manual") {
+      const reason = broker.requiresIdentityDoc
+        ? "pièce d'identité requise"
+        : "action manuelle requise";
       summary.manual++;
       if (!live) {
-        // Dry-run : on ne modifie RIEN, on signale seulement.
         log.info(`[DRY-RUN] action manuelle requise — ${broker.name} : ${reason}`);
         continue;
       }
-      db.update(requests)
-        .set({ status: "manual_required" })
-        .where(eq(requests.id, r.id))
-        .run();
+      db.update(requests).set({ status: "manual_required" }).where(eq(requests.id, r.id)).run();
       audit({
         action: "request_manual_required",
         brokerSlug: broker.slug,
         requestId: r.id,
         fromStatus: r.status,
         toStatus: "manual_required",
-        detail: { channel: r.channel, optOutUrl: broker.optOutUrl, reason },
+        detail: { optOutUrl: broker.optOutUrl, reason },
       });
       log.info(`Action manuelle — ${broker.name} : ${reason}`);
+      continue;
+    }
+
+    // --- Canal formulaire : remplissage auto Playwright (si config) --------
+    if (r.channel === "form") {
+      if (!broker.formConfig?.forms?.length) {
+        // Sans config de formulaire, on ne peut pas automatiser -> action manuelle.
+        summary.manual++;
+        if (!live) {
+          log.info(`[DRY-RUN] formulaire sans config -> action manuelle — ${broker.name}`);
+          continue;
+        }
+        db.update(requests).set({ status: "manual_required" }).where(eq(requests.id, r.id)).run();
+        audit({
+          action: "request_manual_required",
+          brokerSlug: broker.slug,
+          requestId: r.id,
+          fromStatus: r.status,
+          toStatus: "manual_required",
+          detail: { optOutUrl: broker.optOutUrl, reason: "formulaire sans config" },
+        });
+        continue;
+      }
+      if (!live) {
+        log.info(`[DRY-RUN] remplirait + soumettrait le(s) formulaire(s) de ${broker.name}`);
+        summary.simulated++;
+        continue;
+      }
+      const identity = getIdentity(r.identityId);
+      if (!identity) {
+        appendError(r, "identité introuvable pour le formulaire");
+        summary.failed++;
+        continue;
+      }
+      try {
+        const { fillBrokerForms } = await import("../forms/fill");
+        const results = await fillBrokerForms(broker, identity.data, r.plusAlias, { submit: true });
+        if (results.every((x) => x.ok && x.submitted)) {
+          const now = new Date();
+          const deadline = addOneMonth(now);
+          db.update(requests)
+            .set({
+              status: "sent",
+              confidenceStatus: initialConfidenceOnSend(broker.verificationMethod),
+              sentAt: now,
+              deadlineAt: deadline,
+            })
+            .where(eq(requests.id, r.id))
+            .run();
+          audit({
+            action: "request_form_submitted",
+            brokerSlug: broker.slug,
+            requestId: r.id,
+            fromStatus: r.status,
+            toStatus: "sent",
+            detail: { results },
+          });
+          log.info(`Formulaire(s) soumis -> ${broker.name}`);
+          summary.formsSubmitted++;
+        } else {
+          const msg =
+            results.filter((x) => !x.ok).map((x) => x.error).join(" ; ") || "soumission incomplète";
+          appendError(r, `formulaire: ${msg}`);
+          audit({ action: "request_form_failed", brokerSlug: broker.slug, requestId: r.id, detail: { results } });
+          summary.failed++;
+        }
+      } catch (e) {
+        appendError(r, `formulaire: ${(e as Error).message}`);
+        summary.failed++;
+      }
       continue;
     }
 

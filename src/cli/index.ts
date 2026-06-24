@@ -10,21 +10,30 @@
  *   status | requests | review-queue
  *   export
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 import { Command } from "commander";
 import { env, isLive } from "../config/env";
 import { log } from "../config/logger";
 import { closeDatabase } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { createIdentity, listIdentities } from "../identity/service";
-import type { IdentityData } from "../domain/types";
+import {
+  createIdentity,
+  getIdentity,
+  getPrimaryIdentity,
+  listIdentities,
+} from "../identity/service";
+import type { FormConfig, IdentityData, RescanConfig } from "../domain/types";
 import { importSource, seedCurated, type SourceName } from "../brokers/import/run";
 import {
   addOverride,
   getBrokerBySlug,
   listBrokers,
   setActive,
+  setFormConfig,
+  setRescanConfig,
 } from "../brokers/registry";
+import { buildPlusAlias } from "../send/plusAddress";
 import { generateDrafts } from "../requests/draft";
 import {
   approveBatch,
@@ -230,6 +239,49 @@ brokers
     }),
   );
 
+// --- forms (Passe 2, Playwright) -------------------------------------------
+const forms = program.command("forms").description("Formulaires web (Playwright)");
+forms
+  .command("set-config <slug>")
+  .description("Attache une config de formulaire (YAML/JSON) à un broker")
+  .requiredOption("--file <path>", "fichier YAML/JSON décrivant les formulaires")
+  .action((slug: string, opts) =>
+    run(() => {
+      const parsed = parseYaml(readFileSync(opts.file, "utf8")) as FormConfig;
+      if (!parsed?.forms?.length) {
+        throw new Error("Config invalide : objet attendu avec un tableau `forms`.");
+      }
+      log.info(
+        setFormConfig(slug, parsed)
+          ? `Config de formulaire attachée à ${slug} (${parsed.forms.length} formulaire(s)).`
+          : `${slug} introuvable.`,
+      );
+    }),
+  );
+forms
+  .command("rehearse <slug>")
+  .description("Remplit le formulaire SANS soumettre (test des sélecteurs + screenshot)")
+  .option("--identity <id>", "id d'identité (défaut: principale)")
+  .action((slug: string, opts) =>
+    run(async () => {
+      const broker = getBrokerBySlug(slug);
+      if (!broker) throw new Error(`${slug} introuvable.`);
+      const identity = opts.identity ? getIdentity(Number(opts.identity)) : getPrimaryIdentity();
+      if (!identity) throw new Error("Aucune identité. Crée-en une d'abord.");
+      const base = env.MAIL_BASE_ADDRESS || env.SMTP_USER || identity.data.emails[0];
+      const plusAlias = base ? buildPlusAlias(base, slug) : null;
+      const { fillBrokerForms } = await import("../forms/fill");
+      const results = await fillBrokerForms(broker, identity.data, plusAlias, { submit: false });
+      for (const r of results) {
+        console.log(
+          `${r.ok ? "✓" : "✗"} ${r.url} — ${r.filled} champ(s) rempli(s)` +
+            `${r.screenshotPath ? ` — screenshot: ${r.screenshotPath}` : ""}` +
+            `${r.error ? ` — erreur: ${r.error}` : ""}`,
+        );
+      }
+    }),
+  );
+
 // --- draft -----------------------------------------------------------------
 program
   .command("draft")
@@ -330,8 +382,8 @@ program
         max: opts.max ? Number(opts.max) : undefined,
       });
       log.info(
-        `Bilan envoi : ${res.sent} envoyé(s), ${res.simulated} simulé(s) [dry-run], ` +
-          `${res.manual} action(s) manuelle(s), ${res.failed} échec(s) (sur ${res.total}).`,
+        `Bilan : ${res.sent} email(s), ${res.formsSubmitted} formulaire(s), ${res.simulated} simulé(s) [dry-run], ` +
+          `${res.manual} manuel(s), ${res.failed} échec(s) (sur ${res.total}).`,
       );
     }),
   );
@@ -350,6 +402,106 @@ program
       );
     }),
   );
+
+// --- rescan (Passe 2) ------------------------------------------------------
+const rescan = program.command("rescan").description("Re-scan de vérification (recherche publique)");
+rescan
+  .command("run")
+  .description("Re-scanne les brokers à recherche publique configurés")
+  .option("--broker <slug>", "limiter à un broker")
+  .action((opts) =>
+    run(async () => {
+      const { runRescan } = await import("../verify/rescan/pipeline");
+      const r = await runRescan({ brokerSlug: opts.broker });
+      log.info(
+        `Re-scan : ${r.scanned} scanné(s), ${r.confirmed} confirmé(s) supprimé(s), ` +
+          `${r.reacquired} réacquisition(s), ${r.stillPresent} présent(s), ${r.inconclusive} indéterminé(s), ${r.errors} erreur(s).`,
+      );
+    }),
+  );
+rescan
+  .command("set-config <slug>")
+  .description("Attache une config de re-scan (YAML/JSON) à un broker")
+  .requiredOption("--file <path>", "fichier YAML/JSON (searchUrl, foundSelector, notFoundText...)")
+  .action((slug: string, opts) =>
+    run(() => {
+      const cfg = parseYaml(readFileSync(opts.file, "utf8")) as RescanConfig;
+      if (!cfg?.searchUrl) throw new Error("Config invalide : `searchUrl` requis.");
+      log.info(
+        setRescanConfig(slug, cfg)
+          ? `Config de re-scan attachée à ${slug}.`
+          : `${slug} introuvable.`,
+      );
+    }),
+  );
+
+// --- remind / cycle / schedule (Passe 2) -----------------------------------
+program
+  .command("remind")
+  .description("Relance les demandes email en attente dépassant la deadline")
+  .option("--max <n>", "nombre maximum de relances")
+  .action((opts) =>
+    run(async () => {
+      modeBanner();
+      const { sendReminders } = await import("../requests/reminder");
+      const r = await sendReminders({ max: opts.max ? Number(opts.max) : undefined });
+      log.info(
+        `Relances : ${r.sent} envoyée(s), ${r.simulated} simulée(s), ${r.skipped} ignorée(s), ${r.failed} échec(s) (sur ${r.candidates}).`,
+      );
+    }),
+  );
+program
+  .command("cycle")
+  .description("Lance un cycle complet une fois (re-scan + verify + relances + brouillons)")
+  .option("--no-rescan", "sauter le re-scan")
+  .option("--no-verify", "sauter la vérif IMAP")
+  .option("--no-remind", "sauter les relances")
+  .option("--no-draft", "sauter la génération de brouillons")
+  .action((opts) =>
+    run(async () => {
+      const { runCycle } = await import("../scheduler/cycle");
+      const r = await runCycle({
+        rescan: opts.rescan,
+        verify: opts.verify,
+        remind: opts.remind,
+        draft: opts.draft,
+      });
+      log.info(`Cycle terminé. ${r.pendingApproval} demande(s) en attente d'approbation.`);
+    }),
+  );
+program
+  .command("schedule")
+  .description("Démarre le scheduler (cycle tous les 2-3 mois) ; garde le processus ouvert")
+  .option("--cron <expr>", "expression cron (défaut: 1er de chaque 2e mois à 9h)")
+  .option("--now", "lancer un cycle immédiatement au démarrage", false)
+  .action(async (opts) => {
+    // Pas de wrapper run() : on NE ferme PAS la DB, le processus reste vivant.
+    try {
+      modeBanner();
+      const { startScheduler } = await import("../scheduler");
+      startScheduler(opts.cron, { runNow: Boolean(opts.now) });
+    } catch (e) {
+      log.error((e as Error).message);
+      process.exitCode = 1;
+      closeDatabase();
+    }
+  });
+
+// --- serve (API + dashboard) -----------------------------------------------
+program
+  .command("serve")
+  .description("Démarre l'API + le dashboard local (http://127.0.0.1:PORT)")
+  .option("--port <n>", "port", "4317")
+  .action(async (opts) => {
+    try {
+      const { serve } = await import("../server/api");
+      serve(Number(opts.port));
+    } catch (e) {
+      log.error((e as Error).message);
+      process.exitCode = 1;
+      closeDatabase();
+    }
+  });
 
 // --- status / requests -----------------------------------------------------
 program

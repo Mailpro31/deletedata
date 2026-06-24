@@ -8,6 +8,13 @@
       "when": 1782291809828,
       "tag": "0000_secret_ozymandias",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1782294954492,
+      "tag": "0001_modern_paibok",
+      "breakpoints": true
     }
   ]
 }

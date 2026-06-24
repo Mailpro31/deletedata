@@ -5,7 +5,7 @@
 import { and, eq, like } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { brokers, overrides, type BrokerInsert, type BrokerRow } from "../db/schema";
-import type { Channel, Jurisdiction } from "../domain/types";
+import type { Channel, FormConfig, Jurisdiction, RescanConfig } from "../domain/types";
 import { audit } from "../audit/log";
 
 export interface BrokerFilter {
@@ -104,6 +104,20 @@ export function setActive(slug: string, active: boolean): boolean {
   if (res.changes > 0) {
     audit({ action: active ? "broker_activated" : "broker_deactivated", brokerSlug: slug });
   }
+  return res.changes > 0;
+}
+
+export function setFormConfig(slug: string, config: FormConfig): boolean {
+  const db = getDb();
+  const res = db.update(brokers).set({ formConfig: config }).where(eq(brokers.slug, slug)).run();
+  if (res.changes > 0) audit({ action: "broker_form_config_set", brokerSlug: slug });
+  return res.changes > 0;
+}
+
+export function setRescanConfig(slug: string, config: RescanConfig): boolean {
+  const db = getDb();
+  const res = db.update(brokers).set({ rescanConfig: config }).where(eq(brokers.slug, slug)).run();
+  if (res.changes > 0) audit({ action: "broker_rescan_config_set", brokerSlug: slug });
   return res.changes > 0;
 }
 

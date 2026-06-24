@@ -90,6 +90,27 @@ export interface FormConfig {
   }>;
 }
 
+/** Config de re-scan d'un broker à recherche publique (Passe 2, Playwright). */
+export interface RescanConfig {
+  /** URL de recherche ; peut contenir des jetons ($firstName, $lastName, $fullName...). */
+  searchUrl: string;
+  /** Optionnel : remplir un formulaire de recherche avant de lire les résultats. */
+  searchForm?: {
+    fields: Array<{
+      selector: string;
+      value?: string;
+      action?: "fill" | "select" | "click" | "check";
+    }>;
+    submitSelector?: string;
+  };
+  /** Sélecteur dont la PRÉSENCE indique un profil TROUVÉ (encore présent). */
+  foundSelector?: string;
+  /** Texte dont la présence indique AUCUN résultat (supprimé). */
+  notFoundText?: string;
+  /** Délai d'attente après chargement/recherche (ms). */
+  waitMs?: number;
+}
+
 /** Preuve attachée à une demande confirmée. */
 export interface Proof {
   type: "email" | "rescan";

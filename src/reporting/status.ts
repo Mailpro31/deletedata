@@ -153,6 +153,28 @@ export function queryRequests(filter: RequestFilter = {}): RequestView[] {
   }));
 }
 
+export interface RequestDetail {
+  request: typeof requests.$inferSelect;
+  brokerSlug: string;
+  brokerName: string;
+}
+
+export function getRequestDetail(id: number): RequestDetail | undefined {
+  const db = getDb();
+  const row = db
+    .select({ request: requests, slug: brokers.slug, name: brokers.name })
+    .from(requests)
+    .innerJoin(brokers, eq(requests.brokerId, brokers.id))
+    .where(eq(requests.id, id))
+    .get();
+  return row ? { request: row.request, brokerSlug: row.slug, brokerName: row.name } : undefined;
+}
+
+export function listReviewQueue() {
+  const db = getDb();
+  return db.select().from(reviewQueue).orderBy(desc(reviewQueue.id)).all();
+}
+
 // --------------------------------------------------------------------------
 //  Export RGPD (historique)
 // --------------------------------------------------------------------------

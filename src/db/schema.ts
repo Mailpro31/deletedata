@@ -22,6 +22,7 @@ import type {
   Jurisdiction,
   Proof,
   RequestStatus,
+  RescanConfig,
   VerificationMethod,
   BatchStatus,
 } from "../domain/types";
@@ -54,6 +55,7 @@ export const brokers = sqliteTable(
     verificationMethod: text("verification_method").$type<VerificationMethod>().notNull().default("none"),
     requiresIdentityDoc: integer("requires_identity_doc", { mode: "boolean" }).notNull().default(false),
     formConfig: text("form_config", { mode: "json" }).$type<FormConfig>(),
+    rescanConfig: text("rescan_config", { mode: "json" }).$type<RescanConfig>(),
     source: text("source"),
     sourceLicense: text("source_license"),
     // active = "prêt à envoyer" (sous-ensemble curaté). Le reste = pistes.

@@ -222,20 +222,24 @@ npm run cli -- export --format csv --out historique.csv   # preuve RGPD
 - Base **entièrement chiffrée** (SQLCipher) ; fichier illisible sans la passphrase.
 - Région Vertex **UE**. Avertissement clair hors dry-run. Double verrou avant tout envoi.
 
-## Architecture (Passe 1)
+## Architecture
 
 ```
 src/
-  config/   env (zod) · crypto (scrypt + AES-GCM) · logger (redaction)
-  db/       client (SQLCipher) · schema (Drizzle) · migrations
-  domain/   statuts + transitions (garde-fou acknowledged ≠ confirmed) · types
-  brokers/  import (eraser/justvanish/badbool) + seed curaté + registry (overrides)
-  identity/ variantes de mon identité
-  requests/ template RGPD fr · génération brouillons · anti-spam · approbation
-  send/     plus-addressing · envoi email (dry-run + double verrou + retry)
-  verify/   imap (incrémental · rattachement · pipeline) · classify (Vertex)
+  config/    env (zod) · crypto (scrypt + AES-GCM) · logger (redaction)
+  db/        client (SQLCipher) · schema (Drizzle) · migrations
+  domain/    statuts + transitions (garde-fou acknowledged ≠ confirmed) · types
+  brokers/   import (eraser/justvanish/badbool) + seed curaté + registry (overrides)
+  identity/  variantes de mon identité
+  requests/  template RGPD fr · brouillons · anti-spam · approbation · relances
+  send/      plus-addressing · envoi email (dry-run + double verrou + retry)
+  forms/     remplissage de formulaires Playwright (jetons + screenshots)   [P2]
+  verify/    imap (incrémental · rattachement · Vertex) · rescan (Playwright) [P2]
+  scheduler/ cycle complet + node-cron                                       [P2]
+  server/    API Express (pilote le dashboard)                               [P2]
   reporting/ statut honnête + export
-  cli/      pilotage
+  cli/       pilotage
+web/         dashboard React + Vite (proxy /api -> API locale)               [P2]
 ```
 
 ### Sources de brokers
@@ -249,12 +253,84 @@ src/
 Aucune source n'encode proprement le canal (email/form/manual) : il est **inféré**
 puis corrigé via la curation (`active`) et les `overrides`.
 
-## Hors-périmètre Passe 1 → Passe 2
+## Passe 2 — automatisation, re-scan, scheduler, dashboard
 
-- Remplissage **automatique de formulaires** (Playwright, config YAML selector→valeur).
-- **Re-scan** des brokers à recherche publique (preuve `confirmed_rescan`).
-- **Scheduler** (`node-cron`) : cycle complet tous les 2-3 mois + notifications d'approbation.
-- **Dashboard** React + Vite.
+Prérequis Playwright (formulaires + re-scan) : installer le navigateur une fois :
+
+```bash
+npx playwright install chromium
+```
+
+### Remplissage automatique de formulaires (Playwright)
+
+Définis une config par broker (YAML), avec des jetons d'identité
+(`$email`, `$fullName`, `$firstName`, `$lastName`, `$address`, `$phone`,
+`$plusAlias`) :
+
+```yaml
+# spokeo-form.yaml
+forms:
+  - url: "https://www.spokeo.com/optout"
+    fields:
+      - { selector: "#email", value: "$email" }
+      - { selector: "#consent", action: "check" }
+    submitSelector: "button[type=submit]"
+```
+
+```bash
+npm run cli -- forms set-config spokeo --file spokeo-form.yaml
+npm run cli -- forms rehearse spokeo     # remplit SANS soumettre + screenshot (test)
+```
+
+En **live**, `cli send` soumet automatiquement les formulaires configurés
+(screenshots dans `./screenshots`). Sans config, le broker reste « action manuelle ».
+
+### Re-scan (preuve `confirmed_rescan`)
+
+Pour les brokers à recherche publique, configure une recherche :
+
+```yaml
+# spokeo-rescan.yaml
+searchUrl: "https://www.spokeo.com/$firstName-$lastName"
+foundSelector: ".result-card"          # présent => profil ENCORE là
+notFoundText: "no results found"       # présent => supprimé
+waitMs: 2000
+```
+
+```bash
+npm run cli -- rescan set-config spokeo --file spokeo-rescan.yaml
+npm run cli -- rescan run               # profil absent => confidence confirmed_rescan
+```
+
+Honnête : ne conclut « supprimé » que si `notFoundText` est présent **et**
+aucun `foundSelector` ne matche. Un profil réapparu après confirmation =
+**réacquisition** (repasse en attente).
+
+### Relances & cycle complet
+
+```bash
+npm run cli -- remind          # relance les demandes en attente hors délai (max 2)
+npm run cli -- cycle           # re-scan + vérif IMAP + relances + nouveaux brouillons
+```
+
+Le cycle **n'envoie jamais sans approbation** : il notifie quand un lot t'attend.
+
+### Scheduler (node-cron)
+
+```bash
+npm run cli -- schedule --now              # cycle immédiat puis tous les 2 mois
+# ou: SCHEDULE_CRON="0 9 1 */3 *" npm run cli -- schedule
+```
+
+### Dashboard (React + Vite)
+
+- **Dev** : `npm run cli -- serve` (API sur :4317) + `npm run dev --prefix web` (UI sur :5173, proxy /api).
+- **Prod local** : `npm run build --prefix web` puis `npm run cli -- serve` → tout sur `http://127.0.0.1:4317`.
+
+Le dashboard montre l'indicateur honnête (% confirmées supprimées), les brokers
+(filtres, activation, overrides), les demandes (détail + preuve), l'approbation
+des lots, la file « à revoir », et les actions (brouillons / envoi / vérif /
+re-scan / cycle).
 
 ## Avertissement
 
