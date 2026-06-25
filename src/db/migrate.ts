@@ -4,7 +4,7 @@
  * On ne peut PAS utiliser `drizzle-kit migrate` (il ouvre sa propre connexion
  * sans la clé SQLCipher). On passe donc par le migrator + notre client chiffré.
  */
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { openDatabase, closeDatabase } from "./client";
@@ -19,7 +19,9 @@ export function runMigrations(): void {
 }
 
 // Exécution directe : `npm run db:migrate`
-if (import.meta.url === `file://${process.argv[1]}`) {
+// NB: on compare via pathToFileURL pour que ça marche aussi sous Windows
+// (où process.argv[1] utilise des backslashes, pas le schéma file:///).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     runMigrations();
   } finally {
