@@ -1,0 +1,1 @@
+ALTER TABLE `brokers` ADD `rescan_config` text;

@@ -1,0 +1,95 @@
+:root {
+  --bg: #0f1419;
+  --panel: #1a2129;
+  --border: #2b3540;
+  --text: #e6edf3;
+  --muted: #8b98a5;
+  --accent: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.app { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+
+header { display: flex; align-items: center; gap: 1rem; }
+header h1 { margin: 0; font-size: 1.5rem; }
+.mode { font-weight: 600; font-size: 0.85rem; padding: 0.2rem 0.6rem; border-radius: 999px; }
+.mode.dry { color: var(--accent); background: rgba(63, 185, 80, 0.12); }
+.mode.live { color: var(--danger); background: rgba(248, 81, 73, 0.12); }
+
+nav { display: flex; gap: 0.4rem; margin: 1rem 0; flex-wrap: wrap; }
+nav button {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  padding: 0.45rem 0.8rem; border-radius: 6px; cursor: pointer;
+}
+nav button.active { border-color: var(--accent); color: var(--accent); }
+
+button {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  padding: 0.35rem 0.7rem; border-radius: 6px; cursor: pointer; margin-right: 0.3rem;
+}
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.hero {
+  display: flex; align-items: center; gap: 1.2rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.4rem; margin-bottom: 1rem;
+}
+.pct { font-size: 3rem; font-weight: 800; color: var(--accent); }
+.pct-label small { color: var(--muted); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem; }
+.card-title { color: var(--muted); font-size: 0.8rem; }
+.card-value { font-size: 1.8rem; font-weight: 700; }
+.card-sub { color: var(--muted); font-size: 0.75rem; }
+
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+.kv { list-style: none; padding: 0; }
+.kv li { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 0.3rem 0; }
+
+.actions { margin-top: 1rem; }
+.busy { color: var(--warn); margin-left: 0.5rem; }
+
+.filters { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; }
+.filters input[type="text"], .filters input:not([type]), .filters select, input, select {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.35rem 0.5rem;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: rgba(255, 255, 255, 0.03); }
+
+.badge { padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.75rem; background: var(--border); }
+.badge-confirmed { background: rgba(63, 185, 80, 0.2); color: var(--accent); }
+.badge-refused, .badge-failed { background: rgba(248, 81, 73, 0.2); color: var(--danger); }
+.badge-email { background: rgba(63, 185, 80, 0.15); color: var(--accent); }
+.badge-form { background: rgba(210, 153, 34, 0.15); color: var(--warn); }
+.badge-pending, .badge-approved, .badge-awaiting_approval { background: rgba(139, 152, 165, 0.2); color: var(--muted); }
+
+.muted { color: var(--muted); }
+.error { color: var(--danger); }
+.failures { list-style: none; padding: 0; }
+.failures li { color: var(--danger); padding: 0.2rem 0; }
+
+.modal {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.modal-body {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.2rem; max-width: 700px; width: 100%; max-height: 85vh; overflow: auto;
+}
+.modal-body pre { white-space: pre-wrap; background: var(--bg); padding: 0.8rem; border-radius: 6px; font-size: 0.82rem; }
+.proof { color: var(--accent); }

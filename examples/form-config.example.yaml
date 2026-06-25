@@ -1,0 +1,37 @@
+# Exemple de config de remplissage de formulaire (brokers à canal `form`).
+# Copier, adapter les sélecteurs à la vraie page d'opt-out, puis :
+#   npm run cli -- forms set-config <slug> --file mon-form.yaml
+#   npm run cli -- forms rehearse <slug>     # teste SANS soumettre (+ screenshot)
+#
+# Trouver un sélecteur : ouvre la page, clic droit sur le champ -> Inspecter,
+# repère son #id, sa .classe ou son [name].
+#
+# Jetons d'identité utilisables dans `value` :
+#   $email         alias traçable du broker (recommandé)  -> moi+spokeo@gmail.com
+#   $primaryEmail  email principal (sans alias)
+#   $fullName  $firstName  $lastName
+#   $address   $phone      $plusAlias
+#
+# Actions possibles : fill (défaut) | check | uncheck | click | select
+
+forms:
+  - url: "https://exemple-broker.com/opt-out"
+    fields:
+      - selector: "#email"
+        value: "$email"
+        # action: fill          # implicite si omis
+      - selector: "input[name='full_name']"
+        value: "$fullName"
+      - selector: "#reason"
+        value: "Exercice du droit à l'effacement (RGPD art. 17)"
+      - selector: "#consent"
+        action: check
+    submitSelector: "button[type=submit]"
+
+  # Un broker peut avoir plusieurs pages/étapes : ajoute d'autres entrées `- url:`.
+  # - url: "https://exemple-broker.com/opt-out/confirm"
+  #   fields:
+  #     - selector: "#country"
+  #       value: "France"
+  #       action: select
+  #   submitSelector: ".confirm"
